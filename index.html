@@ -192,6 +192,18 @@ select { border: 1px solid var(--line); background: var(--sunk); border-radius: 
 .dock .wrap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding-block: 12px; }
 .dock .count { font-variant-numeric: tabular-nums; font-weight: 600; }
 .dock .warn { color: var(--amber); font-size: 14px; }
+/* Phone: count on its own line, then the switches and Finish side by side */
+@media (max-width: 560px) {
+  .dock .wrap { gap: 6px; padding-block: 8px; }
+  .dock .count, .dock .warn { flex-basis: 100%; font-size: 14px; }
+  .dock .spacer { display: none; }
+  .dock .toggles { gap: 6px; flex-wrap: nowrap; }
+  .dock .tog { font-size: 12px; padding: 4px 8px 4px 4px; gap: 6px; }
+  .dock .tog i { width: 24px; height: 14px; }
+  .dock .tog i::after { width: 10px; height: 10px; }
+  .dock .tog[aria-pressed="true"] i::after { transform: translateX(10px); }
+  .dock #finish { margin-left: auto; padding: 7px 10px; white-space: nowrap; }
+}
 
 .m-only { display: none; }
 @media (max-width: 640px) {
@@ -590,7 +602,9 @@ function noteBtn(id) {
   const label = !on ? "Note" : has ? "Note" : "Add note", aria = !on ? "Open or add note" : has ? "Open note" : "Add note";
   return `<button class="notebtn ${on && has ? "has" : ""}" data-act="note" aria-label="${aria}">${NOTE}<span>${label}</span></button>`;
 }
-const togHTML = (act, on, text) => `<button class="tog" id="${act}" data-act="${act}" aria-pressed="${on}"><i></i>${text}</button>`;
+// While answering, the switches sit in the bottom bar beside Finish; on a finished session (no bar) they sit under the filters.
+const togglesHTML = () => `<div class="toggles">${togHTML("tog-notes", store.showNotes !== false, "Notes", "Show notes")}${togHTML("tog-hist", store.showHist !== false, "Wrong / flagged", "Show wrong and flagged labels")}</div>`;
+const togHTML = (act, on, text, title) => `<button class="tog" id="${act}" data-act="${act}" aria-pressed="${on}" title="${title}" aria-label="${title}"><i></i>${text}</button>`;
 
 function cardHTML(s, id, n, hist) {
   const q = byId[id], chosen = s.answers[id];
@@ -662,7 +676,7 @@ function sessionHTML(s) {
     <div class="row">
       <select id="status" aria-label="Filter by status">${[["all", "All questions"], ["unanswered", "Unanswered"], ["wrong", "Wrong"], ["right", "Right"], ["flagged", "Flagged"], ["noted", "With notes"]].map(([v, t]) => `<option value="${v}" ${S.status === v ? "selected" : ""}>${t}</option>`).join("")}</select>
       <input class="search" id="search" type="search" placeholder="Search questions, options or ID" aria-label="Search" value="${esc(S.search)}"></div>
-    <div class="toggles">${togHTML("tog-notes", store.showNotes !== false, "Show notes")}${togHTML("tog-hist", store.showHist !== false, "Show wrong / flagged labels")}</div>
+    ${s.end ? togglesHTML() : ""}
   </section>
   ${result}
   <div class="list" id="list">${listHTML(s)}</div>
@@ -706,7 +720,7 @@ function renderDock() {
   d.hidden = false;
   $("dock-inner").innerHTML = `<span class="count">${done} of ${n} answered</span>
     ${armed ? `<span class="warn">${left} unanswered. Finish anyway?</span>` : ""}<span class="spacer"></span>
-    <button class="btn primary" id="finish" data-act="finish">${armed ? "Finish anyway" : s.mode === "exam" ? "Submit exam" : "Finish session"}</button>`;
+    ${togglesHTML()}<button class="btn primary" id="finish" data-act="finish">${armed ? "Finish anyway" : s.mode === "exam" ? "Submit exam" : "Finish session"}</button>`;
   setStripH();
 }
 
