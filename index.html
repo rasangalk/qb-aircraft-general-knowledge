@@ -119,6 +119,14 @@ main.wide { max-width: none; padding-right: calc(264px + 48px + max(16px, env(sa
 .chip .n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .chip[aria-pressed="true"] .n { color: var(--accent); }
+.tog { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 5px 12px 5px 6px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.tog:hover { border-color: var(--muted); }
+.tog i { width: 28px; height: 16px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .15s; }
+.tog i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.tog[aria-pressed="true"] { color: var(--ink); }
+.tog[aria-pressed="true"] i { background: var(--accent); }
+.tog[aria-pressed="true"] i::after { transform: translateX(12px); }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .search { flex: 1 1 220px; min-width: 0; border: 1px solid var(--line); background: var(--sunk); border-radius: 8px; padding: 7px 12px; }
 select { border: 1px solid var(--line); background: var(--sunk); border-radius: 8px; padding: 7px 10px; }
@@ -576,6 +584,14 @@ function history(exclude) {
   return h;
 }
 
+// With notes switched off every question shows the same plain "Note" button, so nothing hints which ones have a note.
+function noteBtn(id) {
+  const on = store.showNotes !== false, has = hasNote(id);
+  const label = !on ? "Note" : has ? "Note" : "Add note", aria = !on ? "Open or add note" : has ? "Open note" : "Add note";
+  return `<button class="notebtn ${on && has ? "has" : ""}" data-act="note" aria-label="${aria}">${NOTE}<span>${label}</span></button>`;
+}
+const togHTML = (act, on, text) => `<button class="tog" id="${act}" data-act="${act}" aria-pressed="${on}"><i></i>${text}</button>`;
+
 function cardHTML(s, id, n, hist) {
   const q = byId[id], chosen = s.answers[id];
   const reveal = s.end ? true : s.mode === "practice" && chosen != null;
@@ -595,11 +611,11 @@ function cardHTML(s, id, n, hist) {
   if (reveal) fb = chosen == null ? `<div class="fb skip">Not answered. The answer is ${key}.</div>`
     : chosen === q.a ? `<div class="fb ok">Correct. ${clear}</div>` : `<div class="fb bad">Incorrect. The answer is ${key}. ${clear}</div>`;
   else if (clear) fb = `<div class="fb">${clear}</div>`;
-  const h = hist[id], ht = h ? [h.w ? `<span class="w">wrong in ${h.w} other session${h.w > 1 ? "s" : ""}</span>` : "", h.f ? `<span class="f">flagged in ${h.f}</span>` : ""].filter(Boolean).join(" · ") : "";
+  const h = store.showHist !== false && hist[id], ht = h ? [h.w ? `<span class="w">wrong in ${h.w} other session${h.w > 1 ? "s" : ""}</span>` : "", h.f ? `<span class="f">flagged in ${h.f}</span>` : ""].filter(Boolean).join(" · ") : "";
   const fl = !!s.flags[id];
   return `<article class="card" id="q-${id}" data-id="${id}" data-n="${n}">
     <div class="card-head"><span class="qno">Q${n}</span><span class="meta">ID ${id} · p.${q.page}</span><span class="pill ${tc(q.t)}">${TOPICS[q.t]}</span>
-    <span class="card-acts"><button class="notebtn ${hasNote(id) ? "has" : ""}" data-act="note" aria-label="${hasNote(id) ? "Open note" : "Add note"}">${NOTE}<span>${hasNote(id) ? "Note" : "Add note"}</span></button>
+    <span class="card-acts">${noteBtn(id)}
     <button class="flag" data-act="flag" aria-pressed="${fl}" ${s.end ? "disabled" : ""} aria-label="Flag for review">${FLAG}<span>${fl ? "Flagged" : "Flag"}</span></button></span></div>
     ${ht ? `<div class="hist">${ht}</div>` : ""}
     <p class="qtext">${esc(q.q)}</p>
@@ -646,6 +662,7 @@ function sessionHTML(s) {
     <div class="row">
       <select id="status" aria-label="Filter by status">${[["all", "All questions"], ["unanswered", "Unanswered"], ["wrong", "Wrong"], ["right", "Right"], ["flagged", "Flagged"], ["noted", "With notes"]].map(([v, t]) => `<option value="${v}" ${S.status === v ? "selected" : ""}>${t}</option>`).join("")}</select>
       <input class="search" id="search" type="search" placeholder="Search questions, options or ID" aria-label="Search" value="${esc(S.search)}"></div>
+    <div class="toggles">${togHTML("tog-notes", store.showNotes !== false, "Show notes")}${togHTML("tog-hist", store.showHist !== false, "Show wrong / flagged labels")}</div>
   </section>
   ${result}
   <div class="list" id="list">${listHTML(s)}</div>
@@ -751,6 +768,13 @@ document.addEventListener("click", e => {
   const card = t.closest(".card"), id = card && card.dataset.id;
   if (act !== "del" && act !== "finish") S.armed = null;
 
+  if ((act === "tog-notes" || act === "tog-hist") && s) {
+    const k = act === "tog-notes" ? "showNotes" : "showHist";
+    store[k] = store[k] === false; persist();
+    t.setAttribute("aria-pressed", String(store[k]));
+    $("list").innerHTML = listHTML(s);
+    return;
+  }
   if (act === "answer" && s && !s.end) {
     s.answers[id] = +arg; S.armed = null; commit(s); refreshCard(s, id);
     const c = $("q-" + id), b = c.querySelector(`[data-arg="${arg}"]`);
